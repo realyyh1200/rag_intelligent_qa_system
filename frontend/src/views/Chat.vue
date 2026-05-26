@@ -224,7 +224,7 @@ async function handleSend() {
     await streamChat(
       message,
       conversationId,
-      '你是一个专业的RAG智能问答系统，帮助用户解决问答问题。',
+      '你是一个专业的RAG智能问答系统，帮助用户解决问答问题。不要在回复中自行添加参考文献，所有参考文献将由系统自动追加。',
       filePath,
       (chunk) => {
         loadingContent.value += chunk
@@ -527,7 +527,7 @@ async function onDrop(e) {
     await streamChat(
       enhancedMessage,
       conversationId,
-      '你是一个专业的RAG智能问答系统，帮助用户解决文件处理问题。用户已经提供了文件内容，请直接基于提供的内容进行总结。',
+      '你是一个专业的RAG智能问答系统，帮助用户解决文件处理问题。用户已经提供了文件内容，请直接基于提供的内容进行总结。不要在回复中自行添加参考文献。',
       null,
       (chunk) => {
         loadingContent.value += chunk

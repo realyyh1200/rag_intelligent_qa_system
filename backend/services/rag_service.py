@@ -147,8 +147,11 @@ class RAGService:
         skipped_count = 0
 
         for chunk in chunks:
-            existing = self.db.query(RAGChunk).filter(
-                RAGChunk.chunk_hash == chunk['hash']
+            # 检查当前用户是否已存在相同的chunk（通过file_path和chunk_index判断）
+            existing = self.db.query(RAGChunk).join(RAGFile).filter(
+                RAGChunk.chunk_index == chunk['index'],
+                RAGFile.file_path == chunk['file_path'],
+                RAGFile.user_id == self.user_id
             ).first()
 
             if existing:
@@ -347,6 +350,24 @@ class RAGService:
 
         return score
 
+    def _keyword_matching_score(self, query: str, content: str) -> float:
+        """关键词精确匹配得分 - 用于增强短关键词的召回能力"""
+        score = 0.0
+        query_lower = query.lower()
+        content_lower = content.lower()
+        
+        # 精确匹配整个查询
+        if query_lower in content_lower:
+            score += 5.0
+        
+        # 分词匹配
+        query_terms = [t for t in jieba.cut(query_lower) if len(t) > 1]
+        for term in query_terms:
+            if term in content_lower:
+                score += 1.0
+        
+        return score
+
     def retrieve(self, query: str, top_k: int = 10) -> List[Dict[str, Any]]:
         """使用BM25+余弦相似度召回，加入cross-encoder精排"""
         logger.info(f"🔍 RAG召回开始，查询: {query[:50]}...")
@@ -367,18 +388,27 @@ class RAGService:
         hybrid_results = []
         all_cosine = [result.get('score', 0) for result in qdrant_results]
         all_bm25 = [self._bm25_score(query, result['content']) for result in qdrant_results]
+        all_keyword = [self._keyword_matching_score(query, result['content']) for result in qdrant_results]
         
         cos_min, cos_max = min(all_cosine), max(all_cosine)
         bm25_min, bm25_max = min(all_bm25), max(all_bm25)
+        kw_min, kw_max = min(all_keyword), max(all_keyword)
         
         for i, result in enumerate(qdrant_results):
             cosine_score = result.get('score', 0)
             bm25_score = all_bm25[i]
+            keyword_score = all_keyword[i]
             
             norm_cosine = (cosine_score - cos_min) / (cos_max - cos_min + 1e-8)
             norm_bm25 = (bm25_score - bm25_min) / (bm25_max - bm25_min + 1e-8)
+            norm_keyword = (keyword_score - kw_min) / (kw_max - kw_min + 1e-8)
             
-            hybrid_score = 0.6 * norm_cosine + 0.4 * norm_bm25
+            # 加入关键词匹配得分，增强短关键词召回
+            # 如果有关键词匹配，给予更高权重
+            if keyword_score > 0:
+                hybrid_score = 0.3 * norm_cosine + 0.2 * norm_bm25 + 0.5 * norm_keyword
+            else:
+                hybrid_score = 0.5 * norm_cosine + 0.5 * norm_bm25
 
             hybrid_results.append({
                 'content': result['content'],

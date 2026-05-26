@@ -94,6 +94,7 @@ async def chat_stream(
                 logger.info(f"🤖 开始AI响应生成 - 会话ID: {conversation.id}, 闲聊模式: {is_chit_chat}")
 
                 enhanced_system_prompt = chat_data.system_prompt + "\n\n" + memory_context
+                enhanced_system_prompt += "\n\n【重要】不要在回复中自行添加参考文献，所有参考文献将由系统自动追加。"
                 
                 current_message = chat_data.message
                 if not is_chit_chat and rag_results:
@@ -115,9 +116,13 @@ async def chat_stream(
                     yield f"data: {json.dumps({'content': chunk, 'done': False})}\n\n"
 
                 if not is_chit_chat and rag_results and referenced_files:
-                    references = "\n\n【参考文献】\n" + "\n".join([f"- {f}" for f in referenced_files])
-                    full_response += references
-                    yield f"data: {json.dumps({'content': references, 'done': False})}\n\n"
+                    # 检查AI回复是否已经包含参考文献，避免重复追加
+                    if "【参考文献】" not in full_response:
+                        references = "\n\n【参考文献】\n" + "\n".join([f"- {f}" for f in referenced_files])
+                        full_response += references
+                        yield f"data: {json.dumps({'content': references, 'done': False})}\n\n"
+                    else:
+                        logger.info("✅ AI回复已包含参考文献，跳过系统追加")
 
                 assistant_message = Message(
                     conversation_id=conversation.id,

@@ -25,3 +25,5 @@ Thumbs.db
 # Models
 bge_model/
 cross_encoder_model/
+
+ai_coding_website/test/

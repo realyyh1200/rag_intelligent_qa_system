@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     QDRANT_HOST: str = os.getenv("QDRANT_HOST", "localhost")
     QDRANT_PORT: int = int(os.getenv("QDRANT_PORT", "6333"))
     QDRANT_COLLECTION: str = os.getenv("QDRANT_COLLECTION", "user_memories")
+    QDRANT_RAG_COLLECTION: str = os.getenv("QDRANT_RAG_COLLECTION", "rag_documents")
     QDRANT_VECTOR_SIZE: int = int(os.getenv("QDRANT_VECTOR_SIZE", "1536"))
 
     class Config:

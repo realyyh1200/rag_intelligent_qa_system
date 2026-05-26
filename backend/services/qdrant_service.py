@@ -65,6 +65,8 @@ class QdrantService:
         try:
             collections = self._client.get_collections().collections
             collection_names = [c.name for c in collections]
+            
+            # 确保用户记忆集合存在
             if settings.QDRANT_COLLECTION not in collection_names:
                 self._client.create_collection(
                     collection_name=settings.QDRANT_COLLECTION,
@@ -74,6 +76,17 @@ class QdrantService:
                     )
                 )
                 logger.info(f"Created Qdrant collection: {settings.QDRANT_COLLECTION}")
+            
+            # 确保RAG文档集合存在
+            if settings.QDRANT_RAG_COLLECTION not in collection_names:
+                self._client.create_collection(
+                    collection_name=settings.QDRANT_RAG_COLLECTION,
+                    vectors_config=VectorParams(
+                        size=settings.QDRANT_VECTOR_SIZE,
+                        distance=Distance.COSINE
+                    )
+                )
+                logger.info(f"Created Qdrant collection: {settings.QDRANT_RAG_COLLECTION}")
         except Exception as e:
             logger.error(f"Failed to ensure collection: {e}")
 
@@ -224,7 +237,8 @@ class QdrantService:
     def store_vectors(
         self,
         vectors: List[List[float]],
-        payloads: List[Dict[str, Any]]
+        payloads: List[Dict[str, Any]],
+        collection_name: str = None
     ) -> int:
         """批量存储向量"""
         if self._client is None:
@@ -232,6 +246,15 @@ class QdrantService:
             if not self._reconnect():
                 logger.warning("Failed to reconnect to Qdrant, skipping store")
                 return 0
+        
+        # 默认使用用户记忆集合，如果payload包含file_name则使用RAG集合
+        target_collection = collection_name or settings.QDRANT_COLLECTION
+        if not collection_name:
+            for payload in payloads:
+                if 'file_name' in payload:
+                    target_collection = settings.QDRANT_RAG_COLLECTION
+                    break
+        
         try:
             points = []
             for i, (vector, payload) in enumerate(zip(vectors, payloads)):
@@ -243,10 +266,10 @@ class QdrantService:
                 ))
             
             self._client.upsert(
-                collection_name=settings.QDRANT_COLLECTION,
+                collection_name=target_collection,
                 points=points
             )
-            logger.info(f"Stored {len(points)} vectors")
+            logger.info(f"Stored {len(points)} vectors in collection: {target_collection}")
             return len(points)
         except Exception as e:
             logger.error(f"Failed to store vectors: {e}")
@@ -264,7 +287,7 @@ class QdrantService:
         limit: int = 10,
         score_threshold: float = 0.0
     ) -> List[Dict[str, Any]]:
-        """为RAG搜索向量"""
+        """为RAG搜索向量 - 使用RAG专用集合"""
         if self._client is None:
             logger.warning("Qdrant not connected, attempting reconnect...")
             if not self._reconnect():
@@ -273,7 +296,7 @@ class QdrantService:
         try:
             if hasattr(self._client, 'search'):
                 results = self._client.search(
-                    collection_name=settings.QDRANT_COLLECTION,
+                    collection_name=settings.QDRANT_RAG_COLLECTION,
                     query_vector=query_vector,
                     query_filter=Filter(
                         must=[
@@ -288,7 +311,7 @@ class QdrantService:
                 )
             else:
                 results = self._client.query_points(
-                    collection_name=settings.QDRANT_COLLECTION,
+                    collection_name=settings.QDRANT_RAG_COLLECTION,
                     query=query_vector,
                     query_filter=Filter(
                         must=[
@@ -322,12 +345,12 @@ class QdrantService:
             return []
 
     def delete_vectors_by_file(self, file_path: str, user_id: int) -> bool:
-        """根据文件路径删除向量"""
+        """根据文件路径删除向量 - 从RAG集合中删除"""
         if self._client is None:
             return False
         try:
             self._client.delete(
-                collection_name=settings.QDRANT_COLLECTION,
+                collection_name=settings.QDRANT_RAG_COLLECTION,
                 points_selector=Filter(
                     must=[
                         FieldCondition(key="file_path", match=MatchValue(value=file_path)),
@@ -335,7 +358,7 @@ class QdrantService:
                     ]
                 )
             )
-            logger.info(f"Deleted vectors for file_path={file_path}")
+            logger.info(f"Deleted vectors for file_path={file_path} from RAG collection")
             return True
         except Exception as e:
             logger.error(f"Failed to delete vectors by file: {e}")
