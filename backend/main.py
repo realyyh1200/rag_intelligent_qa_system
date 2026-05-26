@@ -20,8 +20,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="AI File Processing Website API",
-    description="AI文件处理网站后端API",
+    title="RAG Smart Question System API",
+    description="RAG智能问答系统后端API",
     version="1.0.0",
     lifespan=lifespan
 )

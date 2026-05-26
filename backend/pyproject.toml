@@ -1,7 +1,7 @@
 [project]
 name = "ai_file_processing_backend"
 version = "0.1.0"
-description = "AI文件网站后端"
+description = "RAG智能问答系统后端"
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [

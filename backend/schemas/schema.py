@@ -87,7 +87,7 @@ class ConversationResponse(ConversationBase):
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
     conversation_id: Optional[int] = None
-    system_prompt: Optional[str] = "你是一个专业的AI文件助手，帮助用户解决文件处理问题。"
+    system_prompt: Optional[str] = "你是一个专业的RAG智能问答系统，帮助用户解决问答问题。"
     file_path: Optional[str] = None  # 用户当前选中的目录路径
 
 

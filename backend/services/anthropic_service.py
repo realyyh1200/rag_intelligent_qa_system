@@ -13,7 +13,7 @@ class AnthropicService:
     async def stream_chat(
         self,
         messages: List[Dict[str, str]],
-        system_prompt: str = "你是一个专业的AI文件助手，帮助用户解决文件处理问题。",
+        system_prompt: str = "你是一个专业的RAG智能问答系统，帮助用户解决问答问题。",
         tools: Optional[List[Dict[str, Any]]] = None
     ) -> AsyncGenerator[str, None]:
         logger.debug(f"📤 发送到AI的消息数量: {len(messages)}, 工具数量: {len(tools) if tools else 0}")
@@ -39,7 +39,7 @@ class AnthropicService:
     def chat_with_tools(
         self,
         messages: List[Dict[str, str]],
-        system_prompt: str = "你是一个专业的AI文件助手，帮助用户解决文件处理问题。",
+        system_prompt: str = "你是一个专业的RAG智能问答系统，帮助用户解决问答问题。",
         tools: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
@@ -84,7 +84,7 @@ class AnthropicService:
     def chat_sync(
         self,
         messages: List[Dict[str, str]],
-        system_prompt: str = "你是一个专业的AI文件助手，帮助用户解决文件处理问题。"
+        system_prompt: str = "你是一个专业的RAG智能问答系统，帮助用户解决问答问题。"
     ) -> str:
         logger.debug(f"📤 发送同步请求到AI, 消息数量: {len(messages)}")
         try:
