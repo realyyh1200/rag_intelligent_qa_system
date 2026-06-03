@@ -1,9 +1,9 @@
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, Range
+from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, Range, NamedSparseVector, SparseIndex, SparseVectorParams, TextIndexParams, TokenizerType
 from qdrant_client.http.exceptions import UnexpectedResponse
 from core.config import settings
 from core.logger import logger
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 import uuid
 import time
 
@@ -60,33 +60,70 @@ class QdrantService:
         return self._client is not None
 
     def _ensure_collection(self) -> None:
+        """确保所有必要的集合存在，并配置稀疏向量索引支持BM25"""
         if self._client is None:
             return
         try:
             collections = self._client.get_collections().collections
             collection_names = [c.name for c in collections]
             
-            # 确保用户记忆集合存在
+            # 确保用户记忆集合存在（支持稀疏向量BM25）
             if settings.QDRANT_COLLECTION not in collection_names:
                 self._client.create_collection(
                     collection_name=settings.QDRANT_COLLECTION,
                     vectors_config=VectorParams(
                         size=settings.QDRANT_VECTOR_SIZE,
                         distance=Distance.COSINE
+                    ),
+                    sparse_vectors_config={
+                        "text": SparseVectorParams(
+                            index=SparseIndex(
+                                on_disk=False,
+                            )
+                        )
+                    }
+                )
+                # 配置text字段的全文索引
+                self._client.create_field_index(
+                    collection_name=settings.QDRANT_COLLECTION,
+                    field_name="content",
+                    field_schema=TextIndexParams(
+                        type="text",
+                        tokenizer=TokenizerType.MULTILINGUAL,
+                        lowercase=True,
+                        min_token_len=2
                     )
                 )
-                logger.info(f"Created Qdrant collection: {settings.QDRANT_COLLECTION}")
+                logger.info(f"Created Qdrant collection with BM25 support: {settings.QDRANT_COLLECTION}")
             
-            # 确保RAG文档集合存在
+            # 确保RAG文档集合存在（支持稀疏向量BM25）
             if settings.QDRANT_RAG_COLLECTION not in collection_names:
                 self._client.create_collection(
                     collection_name=settings.QDRANT_RAG_COLLECTION,
                     vectors_config=VectorParams(
                         size=settings.QDRANT_VECTOR_SIZE,
                         distance=Distance.COSINE
+                    ),
+                    sparse_vectors_config={
+                        "text": SparseVectorParams(
+                            index=SparseIndex(
+                                on_disk=False,
+                            )
+                        )
+                    }
+                )
+                # 配置text字段的全文索引
+                self._client.create_field_index(
+                    collection_name=settings.QDRANT_RAG_COLLECTION,
+                    field_name="content",
+                    field_schema=TextIndexParams(
+                        type="text",
+                        tokenizer=TokenizerType.MULTILINGUAL,
+                        lowercase=True,
+                        min_token_len=2
                     )
                 )
-                logger.info(f"Created Qdrant collection: {settings.QDRANT_RAG_COLLECTION}")
+                logger.info(f"Created Qdrant RAG collection with BM25 support: {settings.QDRANT_RAG_COLLECTION}")
         except Exception as e:
             logger.error(f"Failed to ensure collection: {e}")
 
@@ -362,6 +399,164 @@ class QdrantService:
             return True
         except Exception as e:
             logger.error(f"Failed to delete vectors by file: {e}")
+            return False
+
+    def count_vectors(self, user_id: int, collection_name: str = None) -> int:
+        """统计用户的向量数量"""
+        if self._client is None:
+            return 0
+        try:
+            target_collection = collection_name or settings.QDRANT_COLLECTION
+            result = self._client.count(
+                collection_name=target_collection,
+                count_filter=Filter(
+                    must=[
+                        FieldCondition(key="user_id", match=MatchValue(value=user_id))
+                    ]
+                )
+            )
+            return result.count
+        except Exception as e:
+            logger.error(f"Failed to count vectors: {e}")
+            return 0
+
+    def count_rag_vectors(self, user_id: int) -> int:
+        """统计用户RAG向量的数量"""
+        return self.count_vectors(user_id, settings.QDRANT_RAG_COLLECTION)
+
+    def list_user_files(self, user_id: int) -> List[Dict[str, Any]]:
+        """获取用户的所有文件列表（基于RAG集合中的file_path去重）"""
+        if self._client is None:
+            return []
+        try:
+            # 使用scroll获取所有属于该用户的记录
+            results = self._client.scroll(
+                collection_name=settings.QDRANT_RAG_COLLECTION,
+                scroll_filter=Filter(
+                    must=[
+                        FieldCondition(key="user_id", match=MatchValue(value=user_id))
+                    ]
+                ),
+                limit=10000,
+                with_payload=True
+            )
+            
+            # 按file_path分组，统计chunk数量
+            file_info: Dict[str, Dict[str, Any]] = {}
+            for point in results[0]:
+                payload = point.payload
+                file_path = payload.get("file_path", "")
+                if file_path:
+                    if file_path not in file_info:
+                        file_info[file_path] = {
+                            "file_name": payload.get("file_name", ""),
+                            "file_path": file_path,
+                            "chunk_count": 0,
+                            "created_at": payload.get("created_at", "")
+                        }
+                    file_info[file_path]["chunk_count"] += 1
+            
+            return list(file_info.values())
+        except Exception as e:
+            logger.error(f"Failed to list user files: {e}")
+            return []
+
+    def get_all_rag_contents_for_user(self, user_id: int) -> List[Dict[str, Any]]:
+        """获取用户所有RAG内容用于BM25检索"""
+        if self._client is None:
+            return []
+        try:
+            results = self._client.scroll(
+                collection_name=settings.QDRANT_RAG_COLLECTION,
+                scroll_filter=Filter(
+                    must=[
+                        FieldCondition(key="user_id", match=MatchValue(value=user_id))
+                    ]
+                ),
+                limit=100000,
+                with_payload=True
+            )
+            
+            return [
+                {
+                    "id": point.id,
+                    "content": point.payload.get("content", ""),
+                    "file_name": point.payload.get("file_name", ""),
+                    "file_path": point.payload.get("file_path", ""),
+                    "chunk_index": point.payload.get("chunk_index", 0)
+                }
+                for point in results[0]
+            ]
+        except Exception as e:
+            logger.error(f"Failed to get all RAG contents: {e}")
+            return []
+
+    def get_all_memory_contents_for_user(self, user_id: int) -> List[Dict[str, Any]]:
+        """获取用户所有记忆内容用于BM25检索"""
+        if self._client is None:
+            return []
+        try:
+            results = self._client.scroll(
+                collection_name=settings.QDRANT_COLLECTION,
+                scroll_filter=Filter(
+                    must=[
+                        FieldCondition(key="user_id", match=MatchValue(value=user_id))
+                    ]
+                ),
+                limit=100000,
+                with_payload=True
+            )
+            
+            return [
+                {
+                    "id": point.payload.get("memory_id", point.id),
+                    "content": point.payload.get("content", ""),
+                    "memory_type": point.payload.get("memory_type", "general"),
+                    "importance": point.payload.get("importance", 1),
+                    "conversation_id": point.payload.get("conversation_id")
+                }
+                for point in results[0]
+            ]
+        except Exception as e:
+            logger.error(f"Failed to get all memory contents: {e}")
+            return []
+
+    def delete_all_user_rag(self, user_id: int) -> bool:
+        """删除用户的所有RAG数据"""
+        if self._client is None:
+            return False
+        try:
+            self._client.delete(
+                collection_name=settings.QDRANT_RAG_COLLECTION,
+                points_selector=Filter(
+                    must=[
+                        FieldCondition(key="user_id", match=MatchValue(value=user_id))
+                    ]
+                )
+            )
+            logger.info(f"Deleted all RAG vectors for user_id={user_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete all user RAG: {e}")
+            return False
+
+    def delete_all_user_memories(self, user_id: int) -> bool:
+        """删除用户的所有记忆数据"""
+        if self._client is None:
+            return False
+        try:
+            self._client.delete(
+                collection_name=settings.QDRANT_COLLECTION,
+                points_selector=Filter(
+                    must=[
+                        FieldCondition(key="user_id", match=MatchValue(value=user_id))
+                    ]
+                )
+            )
+            logger.info(f"Deleted all memory vectors for user_id={user_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete all user memories: {e}")
             return False
 
 

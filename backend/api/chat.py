@@ -9,6 +9,7 @@ from core.security import get_current_active_user
 from services.anthropic_service import AnthropicService
 from services.memory_service import MemoryService
 from services.rag_service import RAGService
+from services.context_manager import ContextManager
 from services.chit_chat_detector import ChitChatDetector
 from core.logger import logger
 import json
@@ -30,12 +31,12 @@ async def chat_stream(
             logger.warning(f"❌ 空消息 - 用户: {current_user.username}")
             raise HTTPException(status_code=400, detail="消息不能为空")
 
-        memory_service = MemoryService(db, current_user.id, chat_data.conversation_id)
+        memory_service = MemoryService(user_id=current_user.id, conversation_id=chat_data.conversation_id)
         
         is_chit_chat = chit_chat_detector.is_chit_chat(chat_data.message)
         
         if not is_chit_chat:
-            rag_service = RAGService(db, current_user.id)
+            rag_service = RAGService(user_id=current_user.id)
 
         conversation = None
         if chat_data.conversation_id:
@@ -73,18 +74,25 @@ async def chat_stream(
         for msg in messages:
             messages_history.append({"role": msg.role, "content": msg.content})
 
-        memory_context = memory_service.get_context_for_ai(include_recent=5)
-
-        rag_results = []
-        referenced_files = set()
+        # ========== 使用GSSC上下文管理流水线 ==========
+        context_manager = ContextManager(user_id=current_user.id)
         
-        if not is_chit_chat:
-            rag_results = rag_service.retrieve(chat_data.message, top_k=5)
-            logger.info(f"🔍 RAG召回结果: {len(rag_results)} 条")
-            
-            if rag_results:
-                for result in rag_results:
-                    referenced_files.add(result['file_name'])
+        # 构建上下文
+        context_result = context_manager.build_context(
+            user_query=chat_data.message,
+            system_prompt=chat_data.system_prompt or "",
+            history=messages_history[:-1] if messages_history else [],  # 不含最新一条
+            enable_rag=not is_chit_chat,
+            enable_memory=True,
+            top_k_rag=5,
+            top_k_memory=3
+        )
+        
+        logger.info(f"📊 GSSC上下文构建完成 - Token: {context_result.token_count}, 压缩: {context_result.was_compressed}")
+        logger.info(f"   来源统计: {context_result.sources_used}")
+        
+        # 获取构建好的prompt
+        enhanced_system_prompt = context_result.final_prompt
 
         async def stream_response() -> AsyncGenerator[str, None]:
             anthropic_service = AnthropicService()
@@ -93,37 +101,16 @@ async def chat_stream(
             try:
                 logger.info(f"🤖 开始AI响应生成 - 会话ID: {conversation.id}, 闲聊模式: {is_chit_chat}")
 
-                enhanced_system_prompt = chat_data.system_prompt + "\n\n" + memory_context
-                enhanced_system_prompt += "\n\n【重要】不要在回复中自行添加参考文献，所有参考文献将由系统自动追加。"
-                
-                current_message = chat_data.message
-                if not is_chit_chat and rag_results:
-                    rag_context = "\n\n【参考文档】\n"
-                    for i, result in enumerate(rag_results, 1):
-                        rag_context += f"\n文档{i}：{result['file_name']}\n"
-                        rag_context += f"内容：{result['content']}\n"
-                    rag_context += "\n\n请基于以上参考文档内容，准确回答我的问题。"
-                    current_message = rag_context + "\n\n【用户问题】\n" + chat_data.message
-                    logger.info(f"📄 已将 {len(rag_results)} 条文档内容作为上下文传递")
-
-                request_messages = messages_history + [{"role": "user", "content": current_message}]
+                request_messages = [{"role": "user", "content": enhanced_system_prompt}]
 
                 async for chunk in anthropic_service.stream_chat(
                     messages=request_messages,
-                    system_prompt=enhanced_system_prompt
+                    system_prompt=""  # 上下文已包含在user message中
                 ):
                     full_response += chunk
                     yield f"data: {json.dumps({'content': chunk, 'done': False})}\n\n"
 
-                if not is_chit_chat and rag_results and referenced_files:
-                    # 检查AI回复是否已经包含参考文献，避免重复追加
-                    if "【参考文献】" not in full_response:
-                        references = "\n\n【参考文献】\n" + "\n".join([f"- {f}" for f in referenced_files])
-                        full_response += references
-                        yield f"data: {json.dumps({'content': references, 'done': False})}\n\n"
-                    else:
-                        logger.info("✅ AI回复已包含参考文献，跳过系统追加")
-
+                # 保存助手回复
                 assistant_message = Message(
                     conversation_id=conversation.id,
                     role="assistant",
@@ -133,8 +120,20 @@ async def chat_stream(
                 conversation.updated_at = conversation.updated_at
                 db.commit()
 
+                # 保存对话到记忆（使用JSON存储）
+                memory_service = MemoryService(user_id=current_user.id, conversation_id=conversation.id)
                 memory_service.add_message("user", chat_data.message)
                 memory_service.add_message("assistant", full_response)
+                
+                # 同时使用ContextManager保存重要记忆
+                if not is_chit_chat and context_result.sources_used.get('rag', 0) > 0:
+                    # 如果有RAG结果，保存相关信息到长期记忆
+                    context_manager.save_memory(
+                        content=f"用户询问: {chat_data.message}\n\nAI回答摘要: {full_response[:500]}...",
+                        memory_type="conversation",
+                        importance=5,
+                        conversation_id=conversation.id
+                    )
 
                 logger.info(f"✅ AI响应完成 - 会话ID: {conversation.id}, 响应长度: {len(full_response)}")
                 yield f"data: {json.dumps({'content': '', 'done': True, 'conversation_id': conversation.id})}\n\n"

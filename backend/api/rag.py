@@ -22,7 +22,7 @@ async def process_files(
     try:
         logger.info(f"📥 用户 {current_user.username} 提交RAG处理请求，路径数量: {len(request.paths)}")
 
-        rag_service = RAGService(db, current_user.id)
+        rag_service = RAGService(user_id=current_user.id)
         result = rag_service.process_files(request.paths)
 
         return result
@@ -41,7 +41,7 @@ async def upload_files(
     try:
         logger.info(f"📥 用户 {current_user.username} 上传RAG文件，数量: {len(request.files)}")
 
-        rag_service = RAGService(db, current_user.id)
+        rag_service = RAGService(user_id=current_user.id)
         result = rag_service.process_uploaded_files([f.dict() for f in request.files])
 
         return result
@@ -91,7 +91,7 @@ async def get_rag_files(
 ):
     """获取用户的RAG文件列表"""
     try:
-        rag_service = RAGService(db, current_user.id)
+        rag_service = RAGService(user_id=current_user.id)
         files = rag_service.get_user_files()
         return files
     except Exception as e:
@@ -99,16 +99,16 @@ async def get_rag_files(
         raise HTTPException(status_code=400, detail=f"获取失败: {str(e)}")
 
 
-@router.delete("/files/{file_id}", response_model=RAGDeleteResponse)
+@router.delete("/files")
 async def delete_rag_file(
-    file_id: int,
+    file_path: str,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """删除用户的RAG文件"""
     try:
-        rag_service = RAGService(db, current_user.id)
-        success = rag_service.delete_file(file_id)
+        rag_service = RAGService(user_id=current_user.id)
+        success = rag_service.delete_file(file_path)
 
         if not success:
             raise HTTPException(status_code=404, detail="文件不存在或无权访问")
@@ -130,7 +130,7 @@ async def retrieve_documents(
 ):
     """检索相关文档"""
     try:
-        rag_service = RAGService(db, current_user.id)
+        rag_service = RAGService(user_id=current_user.id)
         results = rag_service.retrieve(query, top_k)
         return {"results": results}
     except Exception as e:
