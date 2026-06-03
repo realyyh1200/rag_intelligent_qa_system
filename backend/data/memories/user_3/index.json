@@ -1,0 +1,66 @@
+{
+  "user_id": 3,
+  "created_at": "2026-06-03T23:36:01.479248",
+  "updated_at": "2026-06-03T23:55:07.737938",
+  "memory_count": 4,
+  "memories": {
+    "mem_20260603233601_0001": {
+      "memory_type": "conversation",
+      "importance": 5,
+      "conversation_id": 35,
+      "created_at": "2026-06-03T23:36:01.479328",
+      "content_hash": "2357059557940580901",
+      "keyword_count": 20,
+      "access_count": 3,
+      "last_accessed": "2026-06-03T23:54:46.998617"
+    },
+    "mem_20260603234032_0002": {
+      "memory_type": "conversation",
+      "importance": 5,
+      "conversation_id": 35,
+      "created_at": "2026-06-03T23:40:32.189586",
+      "content_hash": "-4613980393756271713",
+      "keyword_count": 20
+    },
+    "mem_20260603235257_0003": {
+      "memory_type": "conversation",
+      "importance": 5,
+      "conversation_id": 35,
+      "created_at": "2026-06-03T23:52:57.148676",
+      "content_hash": "1479976691373782624",
+      "keyword_count": 20
+    },
+    "mem_20260603235507_0004": {
+      "memory_type": "conversation",
+      "importance": 5,
+      "conversation_id": 35,
+      "created_at": "2026-06-03T23:55:07.735933",
+      "content_hash": "-719697223504732563",
+      "keyword_count": 20
+    }
+  },
+  "by_type": {
+    "conversation": [
+      "mem_20260603233601_0001",
+      "mem_20260603234032_0002",
+      "mem_20260603235257_0003",
+      "mem_20260603235507_0004"
+    ]
+  },
+  "by_importance": {
+    "imp_2": [
+      "mem_20260603233601_0001",
+      "mem_20260603234032_0002",
+      "mem_20260603235257_0003",
+      "mem_20260603235507_0004"
+    ]
+  },
+  "by_conversation": {
+    "35": [
+      "mem_20260603233601_0001",
+      "mem_20260603234032_0002",
+      "mem_20260603235257_0003",
+      "mem_20260603235507_0004"
+    ]
+  }
+}

@@ -8,6 +8,7 @@ from services.qdrant_service import QdrantService
 from services.cross_encoder_service import CrossEncoderService
 from services.bm25_service import BM25Service
 from services.rrf_fusion import RRFusion
+from core.config import settings
 from core.logger import logger
 from collections import Counter
 import math
@@ -170,7 +171,7 @@ class RAGService:
                 'chunk_hash': chunk['hash']
             })
 
-        success_count = self.qdrant_service.store_vectors(vectors, payloads, self.qdrant_service._client.collection_name if hasattr(self.qdrant_service, '_client') else None)
+        success_count = self.qdrant_service.store_vectors(vectors, payloads, settings.QDRANT_RAG_COLLECTION)
         logger.info(f"✅ Qdrant存储完成，成功 {success_count} 条")
         return success_count
 
@@ -365,7 +366,7 @@ class RAGService:
             
             # 使用RRF融合精排分数
             ce_ranked = sorted(enumerate(ce_scores), key=lambda x: x[1], reverse=True)
-            ce_ranks = [(i, rank+1) for rank, (i, _) in enumerate(ce_ranks_sorted := ce_ranked)]
+            ce_ranks = [(i, rank+1) for rank, (i, _) in enumerate(ce_ranked)]
             
             # 重新计算RRF分数
             final_scores = []

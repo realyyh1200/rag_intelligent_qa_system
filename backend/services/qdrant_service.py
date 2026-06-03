@@ -1,5 +1,5 @@
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, Range, NamedSparseVector, SparseIndex, SparseVectorParams, TextIndexParams, TokenizerType
+from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, Range, TextIndexParams, TokenizerType
 from qdrant_client.http.exceptions import UnexpectedResponse
 from core.config import settings
 from core.logger import logger
@@ -60,70 +60,34 @@ class QdrantService:
         return self._client is not None
 
     def _ensure_collection(self) -> None:
-        """确保所有必要的集合存在，并配置稀疏向量索引支持BM25"""
+        """确保所有必要的集合存在（BM25使用独立服务）"""
         if self._client is None:
             return
         try:
             collections = self._client.get_collections().collections
             collection_names = [c.name for c in collections]
             
-            # 确保用户记忆集合存在（支持稀疏向量BM25）
+            # 确保用户记忆集合存在
             if settings.QDRANT_COLLECTION not in collection_names:
                 self._client.create_collection(
                     collection_name=settings.QDRANT_COLLECTION,
                     vectors_config=VectorParams(
                         size=settings.QDRANT_VECTOR_SIZE,
                         distance=Distance.COSINE
-                    ),
-                    sparse_vectors_config={
-                        "text": SparseVectorParams(
-                            index=SparseIndex(
-                                on_disk=False,
-                            )
-                        )
-                    }
-                )
-                # 配置text字段的全文索引
-                self._client.create_field_index(
-                    collection_name=settings.QDRANT_COLLECTION,
-                    field_name="content",
-                    field_schema=TextIndexParams(
-                        type="text",
-                        tokenizer=TokenizerType.MULTILINGUAL,
-                        lowercase=True,
-                        min_token_len=2
                     )
                 )
-                logger.info(f"Created Qdrant collection with BM25 support: {settings.QDRANT_COLLECTION}")
+                logger.info(f"Created Qdrant collection: {settings.QDRANT_COLLECTION}")
             
-            # 确保RAG文档集合存在（支持稀疏向量BM25）
+            # 确保RAG文档集合存在
             if settings.QDRANT_RAG_COLLECTION not in collection_names:
                 self._client.create_collection(
                     collection_name=settings.QDRANT_RAG_COLLECTION,
                     vectors_config=VectorParams(
                         size=settings.QDRANT_VECTOR_SIZE,
                         distance=Distance.COSINE
-                    ),
-                    sparse_vectors_config={
-                        "text": SparseVectorParams(
-                            index=SparseIndex(
-                                on_disk=False,
-                            )
-                        )
-                    }
-                )
-                # 配置text字段的全文索引
-                self._client.create_field_index(
-                    collection_name=settings.QDRANT_RAG_COLLECTION,
-                    field_name="content",
-                    field_schema=TextIndexParams(
-                        type="text",
-                        tokenizer=TokenizerType.MULTILINGUAL,
-                        lowercase=True,
-                        min_token_len=2
                     )
                 )
-                logger.info(f"Created Qdrant RAG collection with BM25 support: {settings.QDRANT_RAG_COLLECTION}")
+                logger.info(f"Created Qdrant RAG collection: {settings.QDRANT_RAG_COLLECTION}")
         except Exception as e:
             logger.error(f"Failed to ensure collection: {e}")
 
@@ -176,18 +140,22 @@ class QdrantService:
         query_vector: List[float],
         user_id: int,
         limit: int = 5,
-        score_threshold: float = 0.0
+        score_threshold: float = 0.0,
+        collection_name: str = None
     ) -> List[Dict[str, Any]]:
         if self._client is None:
             logger.warning("Qdrant not connected, attempting reconnect...")
             if not self._reconnect():
                 logger.warning("Failed to reconnect to Qdrant, returning empty results")
                 return []
+        
+        target_collection = collection_name or settings.QDRANT_COLLECTION
+        
         try:
             # 兼容新旧版本的 Qdrant API
             if hasattr(self._client, 'search'):
                 results = self._client.search(
-                    collection_name=settings.QDRANT_COLLECTION,
+                    collection_name=target_collection,
                     query_vector=query_vector,
                     query_filter=Filter(
                         must=[
@@ -203,7 +171,7 @@ class QdrantService:
             else:
                 # 新版 QdrantClient 使用 query_points
                 results = self._client.query_points(
-                    collection_name=settings.QDRANT_COLLECTION,
+                    collection_name=target_collection,
                     query=query_vector,
                     query_filter=Filter(
                         must=[
@@ -315,6 +283,45 @@ class QdrantService:
             except Exception:
                 pass
             return 0
+
+    def upsert_memory(
+        self,
+        user_id: int,
+        memory_id: str,
+        content: str,
+        vector: List[float],
+        memory_type: str = "general",
+        importance: int = 1,
+        metadata: Dict[str, Any] = None
+    ) -> bool:
+        """存储记忆向量到Qdrant"""
+        if self._client is None:
+            if not self._reconnect():
+                return False
+        
+        try:
+            payload = {
+                "user_id": user_id,
+                "memory_id": memory_id,
+                "content": content,
+                "memory_type": memory_type,
+                "importance": importance,
+                "metadata": metadata or {}
+            }
+            
+            self._client.upsert(
+                collection_name=settings.QDRANT_COLLECTION,
+                points=[PointStruct(
+                    id=int(memory_id) if memory_id.isdigit() else int(uuid.uuid4().hex[:15], 16),
+                    vector=vector,
+                    payload=payload
+                )]
+            )
+            logger.debug(f"Upserted memory: {memory_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to upsert memory: {e}")
+            return False
 
     @retry_with_backoff(max_retries=3, delay=1)
     def search_vectors_for_rag(

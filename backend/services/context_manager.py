@@ -155,7 +155,7 @@ class ContextManager:
                 system_prompt=system_prompt
             ),
             token_count=token_count,
-            was_compressed=token_count < self.max_token_budget * 0.7,
+            was_compressed=token_count >= self.max_token_budget * 0.7,
             sources_used={
                 "system": 1 if system_prompt else 0,
                 "history": len(history),
@@ -297,13 +297,16 @@ class ContextManager:
         
         # 生成向量
         embedding = bge_service.encode([content])[0]
+        # 确保是list格式
+        if hasattr(embedding, 'tolist'):
+            embedding = embedding.tolist()
         
         # 存入Qdrant
         self.qdrant_service.upsert_memory(
             user_id=self.user_id,
             memory_id=memory_id,
             content=content,
-            vector=embedding.tolist(),
+            vector=embedding,
             memory_type=memory.get('memory_type'),
             importance=memory.get('importance', 1),
             metadata=memory.get('metadata', {})
