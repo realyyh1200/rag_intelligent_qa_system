@@ -1,8 +1,8 @@
 {
   "user_id": 3,
   "created_at": "2026-06-03T23:36:01.479248",
-  "updated_at": "2026-06-03T23:55:07.737938",
-  "memory_count": 4,
+  "updated_at": "2026-06-04T23:32:18.181598",
+  "memory_count": 8,
   "memories": {
     "mem_20260603233601_0001": {
       "memory_type": "conversation",
@@ -11,8 +11,8 @@
       "created_at": "2026-06-03T23:36:01.479328",
       "content_hash": "2357059557940580901",
       "keyword_count": 20,
-      "access_count": 3,
-      "last_accessed": "2026-06-03T23:54:46.998617"
+      "access_count": 6,
+      "last_accessed": "2026-06-04T23:31:54.999133"
     },
     "mem_20260603234032_0002": {
       "memory_type": "conversation",
@@ -36,6 +36,42 @@
       "conversation_id": 35,
       "created_at": "2026-06-03T23:55:07.735933",
       "content_hash": "-719697223504732563",
+      "keyword_count": 20,
+      "access_count": 3,
+      "last_accessed": "2026-06-04T23:31:55.013434"
+    },
+    "mem_20260604231600_0005": {
+      "memory_type": "conversation",
+      "importance": 5,
+      "conversation_id": 35,
+      "created_at": "2026-06-04T23:16:00.944313",
+      "content_hash": "-856551309181165986",
+      "keyword_count": 20
+    },
+    "mem_20260604232036_0006": {
+      "memory_type": "conversation",
+      "importance": 5,
+      "conversation_id": 35,
+      "created_at": "2026-06-04T23:20:36.789379",
+      "content_hash": "1243838113933067341",
+      "keyword_count": 20
+    },
+    "mem_20260604232717_0007": {
+      "memory_type": "conversation",
+      "importance": 5,
+      "conversation_id": 35,
+      "created_at": "2026-06-04T23:27:17.208801",
+      "content_hash": "7983486927611252012",
+      "keyword_count": 20,
+      "access_count": 1,
+      "last_accessed": "2026-06-04T23:31:55.006767"
+    },
+    "mem_20260604233218_0008": {
+      "memory_type": "conversation",
+      "importance": 5,
+      "conversation_id": 35,
+      "created_at": "2026-06-04T23:32:18.180952",
+      "content_hash": "69652432905789885",
       "keyword_count": 20
     }
   },
@@ -44,7 +80,11 @@
       "mem_20260603233601_0001",
       "mem_20260603234032_0002",
       "mem_20260603235257_0003",
-      "mem_20260603235507_0004"
+      "mem_20260603235507_0004",
+      "mem_20260604231600_0005",
+      "mem_20260604232036_0006",
+      "mem_20260604232717_0007",
+      "mem_20260604233218_0008"
     ]
   },
   "by_importance": {
@@ -52,7 +92,11 @@
       "mem_20260603233601_0001",
       "mem_20260603234032_0002",
       "mem_20260603235257_0003",
-      "mem_20260603235507_0004"
+      "mem_20260603235507_0004",
+      "mem_20260604231600_0005",
+      "mem_20260604232036_0006",
+      "mem_20260604232717_0007",
+      "mem_20260604233218_0008"
     ]
   },
   "by_conversation": {
@@ -60,7 +104,11 @@
       "mem_20260603233601_0001",
       "mem_20260603234032_0002",
       "mem_20260603235257_0003",
-      "mem_20260603235507_0004"
+      "mem_20260603235507_0004",
+      "mem_20260604231600_0005",
+      "mem_20260604232036_0006",
+      "mem_20260604232717_0007",
+      "mem_20260604233218_0008"
     ]
   }
 }

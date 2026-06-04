@@ -398,7 +398,19 @@ class RAGService:
                 result['ce_score'] = 0.0
                 result['final_rrf_score'] = result['rrf_score']
 
-        # 6. 文件多样性控制
+        # 6. 按内容去重（基于内容hash）
+        seen_content_hashes = set()
+        deduplicated = []
+        for result in top_candidates:
+            content_hash = str(hash(result.get('content', '')))
+            if content_hash in seen_content_hashes:
+                continue
+            seen_content_hashes.add(content_hash)
+            deduplicated.append(result)
+        top_candidates = deduplicated
+        logger.info(f"🔄 内容去重后剩余 {len(top_candidates)} 条候选")
+
+        # 7. 文件多样性控制
         file_chunk_count = {}
         final_results = []
         max_chunks_per_file = 3

@@ -212,8 +212,7 @@ class ContextManager:
                 qdrant_results = self.qdrant_service.search_vectors(
                     query_vector=query_embedding,
                     user_id=self.user_id,
-                    limit=top_k,
-                    collection_name="memories"
+                    limit=top_k
                 )
                 
                 for result in qdrant_results:

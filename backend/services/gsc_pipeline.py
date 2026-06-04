@@ -149,10 +149,19 @@ class GatherStage:
     
     def add_rag_results(self, results: List[Dict[str, Any]], 
                        priority: int = 7) -> 'GatherStage':
-        """添加RAG召回结果"""
+        """添加RAG召回结果（自动去重）"""
+        seen_content_hashes = set()
         for result in results:
+            content = result.get('content', '')
+            content_hash = str(hash(content))
+            
+            # 去重
+            if content_hash in seen_content_hashes:
+                continue
+            seen_content_hashes.add(content_hash)
+            
             self.items.append(ContextItem(
-                content=f"【文档: {result.get('file_name', 'unknown')}】\n{result.get('content', '')}",
+                content=f"【文档: {result.get('file_name', 'unknown')}】\n{content}",
                 source=ContextSource.RAG,
                 priority=priority,
                 relevance_score=result.get('final_rrf_score', result.get('rrf_score', 0.5)),
@@ -161,17 +170,27 @@ class GatherStage:
                     "type": "rag",
                     "file_name": result.get('file_name'),
                     "file_path": result.get('file_path'),
-                    "chunk_index": result.get('chunk_index')
+                    "chunk_index": result.get('chunk_index'),
+                    "content_hash": content_hash
                 }
             ))
         return self
     
     def add_memory(self, memories: List[Dict[str, Any]], 
                   priority: int = 6) -> 'GatherStage':
-        """添加记忆内容"""
+        """添加记忆内容（自动去重）"""
+        seen_content_hashes = set()
         for memory in memories:
+            content = memory.get('content', '')
+            content_hash = str(hash(content))
+            
+            # 去重
+            if content_hash in seen_content_hashes:
+                continue
+            seen_content_hashes.add(content_hash)
+            
             self.items.append(ContextItem(
-                content=memory.get('content', ''),
+                content=content,
                 source=ContextSource.MEMORY,
                 priority=priority,
                 relevance_score=memory.get('importance', 1) / 10.0,
@@ -179,7 +198,9 @@ class GatherStage:
                 metadata={
                     "type": "memory",
                     "memory_type": memory.get('memory_type'),
-                    "importance": memory.get('importance', 1)
+                    "importance": memory.get('importance', 1),
+                    "memory_id": memory.get('id'),
+                    "content_hash": content_hash
                 }
             ))
         return self
@@ -221,10 +242,16 @@ class SelectStage:
     
     def _calculate_composite_score(self, item: ContextItem) -> float:
         """计算综合评分 = 相关性×权重 + 新近性×权重"""
-        return (
-            self.relevance_weight * item.relevance_score +
-            self.recency_weight * item.recency_score
-        ) * (item.priority / 10.0)  # 乘以优先级归一化
+        # 如果是RAG来源，直接使用其RRF分数（已经是0-1范围）并放大
+        if item.source == ContextSource.RAG:
+            base_score = item.relevance_score * 10  # RRF分数放大10倍
+        else:
+            base_score = (
+                self.relevance_weight * item.relevance_score +
+                self.recency_weight * item.recency_score
+            )
+        
+        return base_score * (item.priority / 10.0)  # 乘以优先级归一化
     
     def select(self, items: List[ContextItem], 
               query: str = "") -> Tuple[List[ContextItem], int]:
@@ -232,23 +259,41 @@ class SelectStage:
         执行选择，返回选中的上下文项和总token数
         
         使用贪心算法：
-        1. 按综合评分降序排序
-        2. 依次选择，直到Token预算耗尽
-        3. 跳过低于相关性阈值的项
+        1. RAG来源：直接取RRF分数最高的前K个（不听写阈值）
+        2. 其他来源：按综合评分降序排序，依次选择
+        3. 跳过低于相关性阈值的非RAG项
         """
-        # 计算所有项的综合评分
-        for item in items:
+        # 分离RAG和非RAG项
+        rag_items = [item for item in items if item.source == ContextSource.RAG]
+        other_items = [item for item in items if item.source != ContextSource.RAG]
+        
+        # 计算非RAG项的综合评分
+        for item in other_items:
             item.relevance_score = self._calculate_composite_score(item)
         
-        # 按综合评分排序
-        sorted_items = sorted(items, 
-                            key=lambda x: x.relevance_score, 
-                            reverse=True)
+        # RAG项按原始RRF分数排序（不需要阈值过滤）
+        rag_items_sorted = sorted(rag_items, 
+                                 key=lambda x: x.relevance_score, 
+                                 reverse=True)
+        
+        # 非RAG项按综合评分排序
+        other_items_sorted = sorted(other_items, 
+                                  key=lambda x: x.relevance_score, 
+                                  reverse=True)
         
         selected = []
         total_tokens = 0
         
-        for item in sorted_items:
+        # 先处理RAG项（取前5个或根据token预算）
+        for item in rag_items_sorted[:5]:
+            if total_tokens + item.token_count > self.max_token_budget:
+                continue
+            selected.append(item)
+            total_tokens += item.token_count
+            logger.debug(f"   ✅ 选中RAG [{item.source.value}] (RRF={item.relevance_score:.4f}, tokens={item.token_count})")
+        
+        # 处理其他项
+        for item in other_items_sorted:
             # 跳过低于相关性阈值的项
             if item.relevance_score < self.min_relevance_threshold:
                 logger.debug(f"   ⏭️ 跳过 [{item.source.value}] (score={item.relevance_score:.3f} < {self.min_relevance_threshold})")
@@ -256,7 +301,7 @@ class SelectStage:
             
             # 检查Token预算
             if total_tokens + item.token_count > self.max_token_budget:
-                logger.debug(f"   ⏭️ Token预算耗尽 [{item.source.value}] (need {item.token_count}, have {self.max_token_budget - total_tokens})")
+                logger.debug(f"   ⏭️ Token预算耗尽 [{item.source.value}]")
                 continue
             
             selected.append(item)
@@ -308,6 +353,9 @@ class StructureStage:
         rag_items = [item for item in items if item.source == ContextSource.RAG]
         if rag_items:
             context.evidence = "\n\n".join([item.content for item in rag_items])
+            logger.debug(f"📋 Structure: 添加了 {len(rag_items)} 条RAG证据")
+        else:
+            logger.warning("⚠️ Structure: 没有RAG证据被添加!")
         
         # 5. 上下文（历史对话 + 记忆）
         other_items = [item for item in items if item.source != ContextSource.RAG]

@@ -186,7 +186,7 @@ class QdrantService:
                 ).points
             return [
                 {
-                    "id": r.id,
+                    "id": r.id,  # 直接使用point_id
                     "score": r.score,
                     "payload": r.payload
                 }
@@ -263,7 +263,8 @@ class QdrantService:
         try:
             points = []
             for i, (vector, payload) in enumerate(zip(vectors, payloads)):
-                point_id = int(uuid.uuid4().hex[:15], 16)
+                # 使用payload中的id作为point_id，确保检索时ID一致
+                point_id = payload.get('id', int(uuid.uuid4().hex[:15], 16))
                 points.append(PointStruct(
                     id=point_id,
                     vector=vector,
@@ -371,7 +372,7 @@ class QdrantService:
             
             return [
                 {
-                    "id": r.id,
+                    "id": r.id,  # 直接使用point_id，即原始chunk_id
                     "score": r.score,
                     "content": r.payload.get("content", ""),
                     "file_name": r.payload.get("file_name", ""),
