@@ -57,13 +57,6 @@
           </div>
         </div>
       </div>
-
-      <div class="sidebar-footer">
-        <div class="user-info">
-          <span>{{ authStore.user?.username }}</span>
-          <button @click="handleLogout" class="logout-btn">退出</button>
-        </div>
-      </div>
     </aside>
 
     <main class="chat-main">
@@ -118,8 +111,6 @@
 
 <script setup>
 import { ref, onMounted, nextTick, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '../store/auth'
 import FileItem from '../components/FileItem.vue'
 import RAGPanel from '../components/RAGPanel.vue'
 import {
@@ -129,9 +120,6 @@ import {
   deleteConversation as apiDeleteConversation,
   streamChat
 } from '../api/chat'
-
-const router = useRouter()
-const authStore = useAuthStore()
 
 const conversations = ref([])
 const currentConversation = ref(null)
@@ -148,9 +136,6 @@ const fileList = ref([])
 const expandedFolders = ref([])
 
 onMounted(async () => {
-  if (!authStore.isAuthenticated) {
-    await authStore.fetchUser()
-  }
   await loadConversations()
   // 尝试从localStorage恢复之前选择的文件夹名称
   const savedFolder = localStorage.getItem('projectFolder')
@@ -281,12 +266,6 @@ function scrollToBottom() {
   if (messagesContainer.value) {
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
   }
-}
-
-function handleLogout() {
-  authStore.logout()
-  localStorage.removeItem('projectFolder')
-  router.push('/login')
 }
 
 // 文件夹选择相关函数
@@ -809,32 +788,6 @@ async function onDrop(e) {
 
 .delete-btn:hover {
   color: #c0392b;
-}
-
-.sidebar-footer {
-  padding: 15px;
-  border-top: 1px solid #34495e;
-}
-
-.user-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
-}
-
-.logout-btn {
-  background: #e74c3c;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.logout-btn:hover {
-  background: #c0392b;
 }
 
 .chat-main {

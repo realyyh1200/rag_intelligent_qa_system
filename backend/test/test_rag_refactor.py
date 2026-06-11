@@ -1,32 +1,32 @@
 """
 RAG重构后的测试脚本
-测试Qdrant存储和检索功能
+测试ChromaDB存储和检索功能
 """
 import sys
 import os
 
 # 添加backend目录到Python路径
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from services.qdrant_service import QdrantService
+from services.chroma_service import ChromaService
 from services.rag_service import RAGService
 from services.bm25_service import BM25Service
 from services.memory_service import MemoryService
 
 
-def test_qdrant_service():
-    """测试Qdrant服务"""
+def test_chroma_service():
+    """测试ChromaDB服务"""
     print("=" * 60)
-    print("测试 QdrantService")
+    print("测试 ChromaService")
     print("=" * 60)
     
-    qdrant = QdrantService()
+    chroma = ChromaService()
     
-    # 检查连接
-    if qdrant.is_connected():
-        print("✅ Qdrant连接成功")
+    # 检查服务初始化
+    if chroma.client:
+        print("✅ ChromaDB初始化成功")
     else:
-        print("❌ Qdrant连接失败")
+        print("❌ ChromaDB初始化失败")
         return False
     
     # 测试集合创建
@@ -130,7 +130,7 @@ def main():
     print("=" * 60 + "\n")
     
     tests = [
-        ("Qdrant服务", test_qdrant_service),
+        ("ChromaDB服务", test_chroma_service),
         ("BM25服务", test_bm25_service),
         ("RAG服务", test_rag_service),
         ("Memory服务", test_memory_service),

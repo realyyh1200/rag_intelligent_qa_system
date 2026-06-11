@@ -1,0 +1,42 @@
+{
+  "user_id": null,
+  "created_at": "2026-06-09T19:07:59.206864",
+  "updated_at": "2026-06-09T19:08:10.203626",
+  "sessions": [
+    {
+      "id": "sess_20260609_190759_35",
+      "file": "sess_20260609_190759_35.jsonl",
+      "conversation_id": 35,
+      "created_at": "2026-06-09T19:07:59.206559",
+      "updated_at": "2026-06-09T19:07:59.206564",
+      "message_count": 0,
+      "memory_count": 0,
+      "model": "migrated",
+      "tags": [
+        "migrated"
+      ]
+    },
+    {
+      "id": "sess_20260609_190810_35",
+      "file": "sess_20260609_190810_35.jsonl",
+      "conversation_id": 35,
+      "created_at": "2026-06-09T19:08:10.088396",
+      "updated_at": "2026-06-09T19:08:10.196839",
+      "message_count": 0,
+      "memory_count": 8,
+      "model": "migrated",
+      "tags": [
+        "migrated"
+      ]
+    }
+  ],
+  "by_conversation": {
+    "35": "sess_20260609_190810_35"
+  },
+  "by_tag": {
+    "migrated": [
+      "sess_20260609_190759_35",
+      "sess_20260609_190810_35"
+    ]
+  }
+}

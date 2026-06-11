@@ -1,0 +1,214 @@
+{
+  "user_id": null,
+  "created_at": "2026-06-10T20:12:16.641539",
+  "updated_at": "2026-06-11T23:17:35.565448",
+  "sessions": [
+    {
+      "id": "sess_20260610_201216_100",
+      "file": "sess_20260610_201216_100.jsonl",
+      "conversation_id": 100,
+      "created_at": "2026-06-10T20:12:16.641419",
+      "updated_at": "2026-06-10T20:12:16.648042",
+      "message_count": 0,
+      "memory_count": 1,
+      "model": "test",
+      "tags": [
+        "test"
+      ]
+    },
+    {
+      "id": "sess_20260610_203027_100",
+      "file": "sess_20260610_203027_100.jsonl",
+      "conversation_id": 100,
+      "created_at": "2026-06-10T20:30:27.088156",
+      "updated_at": "2026-06-10T20:30:27.095129",
+      "message_count": 0,
+      "memory_count": 1,
+      "model": "test",
+      "tags": [
+        "test"
+      ]
+    },
+    {
+      "id": "sess_20260610_205847_100",
+      "file": "sess_20260610_205847_100.jsonl",
+      "conversation_id": 100,
+      "created_at": "2026-06-10T20:58:47.935559",
+      "updated_at": "2026-06-10T20:58:47.943364",
+      "message_count": 0,
+      "memory_count": 1,
+      "model": "test",
+      "tags": [
+        "test"
+      ]
+    },
+    {
+      "id": "sess_20260610_210800_100",
+      "file": "sess_20260610_210800_100.jsonl",
+      "conversation_id": 100,
+      "created_at": "2026-06-10T21:08:00.269155",
+      "updated_at": "2026-06-10T21:08:00.276836",
+      "message_count": 0,
+      "memory_count": 1,
+      "model": "test",
+      "tags": [
+        "test"
+      ]
+    },
+    {
+      "id": "sess_20260610_211802_100",
+      "file": "sess_20260610_211802_100.jsonl",
+      "conversation_id": 100,
+      "created_at": "2026-06-10T21:18:02.937968",
+      "updated_at": "2026-06-10T21:18:02.945467",
+      "message_count": 0,
+      "memory_count": 1,
+      "model": "test",
+      "tags": [
+        "test"
+      ]
+    },
+    {
+      "id": "sess_20260610_212847_300",
+      "file": "sess_20260610_212847_300.jsonl",
+      "conversation_id": 300,
+      "created_at": "2026-06-10T21:28:47.893158",
+      "updated_at": "2026-06-10T21:28:47.900775",
+      "message_count": 0,
+      "memory_count": 1,
+      "model": "default",
+      "tags": []
+    },
+    {
+      "id": "sess_20260610_213754_new",
+      "file": "sess_20260610_213754_new.jsonl",
+      "conversation_id": null,
+      "created_at": "2026-06-10T21:37:54.649399",
+      "updated_at": "2026-06-11T23:17:35.557543",
+      "message_count": 0,
+      "memory_count": 3,
+      "model": "default",
+      "tags": []
+    },
+    {
+      "id": "sess_20260610_213754_300",
+      "file": "sess_20260610_213754_300.jsonl",
+      "conversation_id": 300,
+      "created_at": "2026-06-10T21:37:54.667477",
+      "updated_at": "2026-06-10T21:37:54.681119",
+      "message_count": 0,
+      "memory_count": 1,
+      "model": "default",
+      "tags": []
+    },
+    {
+      "id": "sess_20260610_215757_300",
+      "file": "sess_20260610_215757_300.jsonl",
+      "conversation_id": 300,
+      "created_at": "2026-06-10T21:57:57.880437",
+      "updated_at": "2026-06-10T21:57:57.890055",
+      "message_count": 0,
+      "memory_count": 1,
+      "model": "default",
+      "tags": []
+    },
+    {
+      "id": "sess_20260611_222750_1",
+      "file": "sess_20260611_222750_1.jsonl",
+      "conversation_id": 1,
+      "created_at": "2026-06-11T22:27:50.574626",
+      "updated_at": "2026-06-11T22:27:50.583088",
+      "message_count": 0,
+      "memory_count": 1,
+      "model": "default",
+      "tags": []
+    },
+    {
+      "id": "sess_20260611_223203_2",
+      "file": "sess_20260611_223203_2.jsonl",
+      "conversation_id": 2,
+      "created_at": "2026-06-11T22:32:03.047041",
+      "updated_at": "2026-06-11T23:16:31.985540",
+      "message_count": 0,
+      "memory_count": 2,
+      "model": "default",
+      "tags": []
+    },
+    {
+      "id": "sess_20260611_223428_3",
+      "file": "sess_20260611_223428_3.jsonl",
+      "conversation_id": 3,
+      "created_at": "2026-06-11T22:34:28.310615",
+      "updated_at": "2026-06-11T23:17:35.466038",
+      "message_count": 0,
+      "memory_count": 2,
+      "model": "default",
+      "tags": []
+    },
+    {
+      "id": "sess_20260611_223647_4",
+      "file": "sess_20260611_223647_4.jsonl",
+      "conversation_id": 4,
+      "created_at": "2026-06-11T22:36:47.082979",
+      "updated_at": "2026-06-11T22:36:47.091584",
+      "message_count": 0,
+      "memory_count": 1,
+      "model": "default",
+      "tags": []
+    },
+    {
+      "id": "sess_20260611_223847_5",
+      "file": "sess_20260611_223847_5.jsonl",
+      "conversation_id": 5,
+      "created_at": "2026-06-11T22:38:47.361441",
+      "updated_at": "2026-06-11T22:38:47.369298",
+      "message_count": 0,
+      "memory_count": 1,
+      "model": "default",
+      "tags": []
+    },
+    {
+      "id": "sess_20260611_230629_8",
+      "file": "sess_20260611_230629_8.jsonl",
+      "conversation_id": 8,
+      "created_at": "2026-06-11T23:06:29.751847",
+      "updated_at": "2026-06-11T23:06:29.762449",
+      "message_count": 0,
+      "memory_count": 1,
+      "model": "default",
+      "tags": []
+    },
+    {
+      "id": "sess_20260611_231219_9",
+      "file": "sess_20260611_231219_9.jsonl",
+      "conversation_id": 9,
+      "created_at": "2026-06-11T23:12:19.041883",
+      "updated_at": "2026-06-11T23:12:19.052882",
+      "message_count": 0,
+      "memory_count": 1,
+      "model": "default",
+      "tags": []
+    }
+  ],
+  "by_conversation": {
+    "100": "sess_20260610_211802_100",
+    "300": "sess_20260610_215757_300",
+    "None": "sess_20260610_213754_new",
+    "1": "sess_20260611_222750_1",
+    "2": "sess_20260611_223203_2",
+    "3": "sess_20260611_223428_3",
+    "4": "sess_20260611_223647_4",
+    "5": "sess_20260611_223847_5",
+    "8": "sess_20260611_230629_8",
+    "9": "sess_20260611_231219_9"
+  },
+  "by_tag": {
+    "test": [
+      "sess_20260610_201216_100",
+      "sess_20260610_203027_100",
+      "sess_20260610_205847_100",
+      "sess_20260610_210800_100",
+      "sess_20260610_211802_100"
+    ]
+  }
+}

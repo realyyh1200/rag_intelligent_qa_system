@@ -1,47 +1,44 @@
 import axios from 'axios'
-import { useAuthStore } from '../store/auth'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
-async function getAuthHeaders() {
-  const authStore = useAuthStore()
+function getHeaders() {
   return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${authStore.accessToken}`
+    'Content-Type': 'application/json'
   }
 }
 
 export async function fetchConversations() {
-  const headers = await getAuthHeaders()
+  const headers = getHeaders()
   const response = await axios.get(`${API_BASE_URL}/chat/conversations`, { headers })
   return response.data
 }
 
 export async function createConversation(title) {
-  const headers = await getAuthHeaders()
+  const headers = getHeaders()
   const response = await axios.post(`${API_BASE_URL}/chat/conversations`, { title }, { headers })
   return response.data
 }
 
 export async function getConversation(conversationId) {
-  const headers = await getAuthHeaders()
+  const headers = getHeaders()
   const response = await axios.get(`${API_BASE_URL}/chat/conversations/${conversationId}`, { headers })
   return response.data
 }
 
 export async function updateConversation(conversationId, data) {
-  const headers = await getAuthHeaders()
+  const headers = getHeaders()
   const response = await axios.patch(`${API_BASE_URL}/chat/conversations/${conversationId}`, data, { headers })
   return response.data
 }
 
 export async function deleteConversation(conversationId) {
-  const headers = await getAuthHeaders()
+  const headers = getHeaders()
   await axios.delete(`${API_BASE_URL}/chat/conversations/${conversationId}`, { headers })
 }
 
 export async function streamChat(message, conversationId, systemPrompt, filePath, onChunk, onDone, onError) {
-  const headers = await getAuthHeaders()
+  const headers = getHeaders()
 
   const response = await fetch(`${API_BASE_URL}/chat/stream`, {
     method: 'POST',

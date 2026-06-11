@@ -8,7 +8,7 @@ class RAGFile(Base):
     __tablename__ = "rag_files"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, index=True)  # 简化：不再关联users表
     file_name = Column(String(255), nullable=False)
     file_path = Column(Text, nullable=False)
     file_size = Column(Integer)

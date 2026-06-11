@@ -8,7 +8,7 @@ class UserMemory(Base):
     __tablename__ = "user_memories"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, index=True)  # 简化：不再关联users表
     conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=True, index=True)
     memory_type = Column(String(50), default="general", index=True)
     content = Column(Text, nullable=False)
@@ -21,5 +21,4 @@ class UserMemory(Base):
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    user = relationship("User", backref="memories")
     conversation = relationship("Conversation", backref="memories")

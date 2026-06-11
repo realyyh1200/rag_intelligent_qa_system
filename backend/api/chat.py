@@ -3,10 +3,9 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import AsyncGenerator
 from db.database import get_db
-from models.user import User, Conversation, Message
+from models.conversation import Conversation, Message
 from schemas.schema import ChatRequest, ConversationCreate, ConversationResponse, ConversationUpdate
-from core.security import get_current_active_user
-from services.anthropic_service import AnthropicService
+from services.openai_service import OpenAIService
 from services.memory_service import MemoryService
 from services.rag_service import RAGService
 from services.context_manager import ContextManager
@@ -18,31 +17,36 @@ router = APIRouter()
 chit_chat_detector = ChitChatDetector()
 
 
+def _get_default_user(db: Session):
+    """获取默认用户（id=1），不再鉴权 - 简化版本"""
+    return {"id": 1, "username": "default_user"}
+
+
 @router.post("/stream")
 async def chat_stream(
     chat_data: ChatRequest,
-    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
+    current_user = _get_default_user(db)
     try:
-        logger.info(f"💬 用户 {current_user.username} 发起聊天请求 (会话ID: {chat_data.conversation_id})")
+        logger.info(f"💬 用户 {current_user['username'] if current_user else 'unknown'} 发起聊天请求 (会话ID: {chat_data.conversation_id})")
 
         if not chat_data.message.strip():
-            logger.warning(f"❌ 空消息 - 用户: {current_user.username}")
+            logger.warning(f"❌ 空消息")
             raise HTTPException(status_code=400, detail="消息不能为空")
 
-        memory_service = MemoryService(user_id=current_user.id, conversation_id=chat_data.conversation_id)
+        memory_service = MemoryService(user_id=1, conversation_id=chat_data.conversation_id)
         
         is_chit_chat = chit_chat_detector.is_chit_chat(chat_data.message)
         
         if not is_chit_chat:
-            rag_service = RAGService(user_id=current_user.id)
+            rag_service = RAGService(user_id=1)
 
         conversation = None
         if chat_data.conversation_id:
             conversation = db.query(Conversation).filter(
                 Conversation.id == chat_data.conversation_id,
-                Conversation.user_id == current_user.id
+                Conversation.user_id == 1
             ).first()
             if not conversation:
                 logger.warning(f"❌ 会话不存在 - ID: {chat_data.conversation_id}")
@@ -50,13 +54,13 @@ async def chat_stream(
 
         if not conversation:
             conversation = Conversation(
-                user_id=current_user.id,
+                user_id=1,
                 title=chat_data.message[:50] + "..." if len(chat_data.message) > 50 else chat_data.message
             )
             db.add(conversation)
             db.commit()
             db.refresh(conversation)
-            logger.info(f"✅ 创建新会话 - ID: {conversation.id}, 用户: {current_user.username}")
+            logger.info(f"✅ 创建新会话 - ID: {conversation.id}")
 
         user_message = Message(
             conversation_id=conversation.id,
@@ -75,7 +79,7 @@ async def chat_stream(
             messages_history.append({"role": msg.role, "content": msg.content})
 
         # ========== 使用GSSC上下文管理流水线 ==========
-        context_manager = ContextManager(user_id=current_user.id)
+        context_manager = ContextManager(user_id=1)
         
         # 构建上下文
         context_result = context_manager.build_context(
@@ -95,17 +99,17 @@ async def chat_stream(
         enhanced_system_prompt = context_result.final_prompt
 
         async def stream_response() -> AsyncGenerator[str, None]:
-            anthropic_service = AnthropicService()
+            openai_service = OpenAIService()
 
             full_response = ""
             try:
                 logger.info(f"🤖 开始AI响应生成 - 会话ID: {conversation.id}, 闲聊模式: {is_chit_chat}")
 
-                request_messages = [{"role": "user", "content": enhanced_system_prompt}]
+                request_messages = [{"role": "user", "content": chat_data.message}]
 
-                async for chunk in anthropic_service.stream_chat(
+                async for chunk in openai_service.stream_chat(
                     messages=request_messages,
-                    system_prompt=""  # 上下文已包含在user message中
+                    system_prompt=enhanced_system_prompt
                 ):
                     full_response += chunk
                     yield f"data: {json.dumps({'content': chunk, 'done': False})}\n\n"
@@ -121,7 +125,7 @@ async def chat_stream(
                 db.commit()
 
                 # 保存对话到记忆（使用JSON存储）
-                memory_service = MemoryService(user_id=current_user.id, conversation_id=conversation.id)
+                memory_service = MemoryService(user_id=1, conversation_id=conversation.id)
                 memory_service.add_message("user", chat_data.message)
                 memory_service.add_message("assistant", full_response)
                 
@@ -160,13 +164,12 @@ async def chat_stream(
 
 @router.get("/conversations", response_model=list[ConversationResponse])
 async def get_conversations(
-    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     try:
-        logger.info(f"📋 用户 {current_user.username} 获取会话列表")
+        logger.info(f"📋 获取会话列表")
         conversations = db.query(Conversation).filter(
-            Conversation.user_id == current_user.id
+            Conversation.user_id == 1
         ).order_by(Conversation.updated_at.desc()).all()
         logger.info(f"✅ 获取会话列表成功 - 数量: {len(conversations)}")
         return conversations
@@ -180,13 +183,12 @@ async def get_conversations(
 @router.post("/conversations", response_model=ConversationResponse)
 async def create_conversation(
     conversation_data: ConversationCreate,
-    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     try:
-        logger.info(f"📝 用户 {current_user.username} 创建新会话")
+        logger.info(f"📝 创建新会话")
         conversation = Conversation(
-            user_id=current_user.id,
+            user_id=1,
             title=conversation_data.title or "新对话"
         )
         db.add(conversation)
@@ -204,14 +206,13 @@ async def create_conversation(
 @router.delete("/conversations/{conversation_id}")
 async def delete_conversation(
     conversation_id: int,
-    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     try:
-        logger.info(f"🗑️ 用户 {current_user.username} 删除会话 - ID: {conversation_id}")
+        logger.info(f"🗑️ 删除会话 - ID: {conversation_id}")
         conversation = db.query(Conversation).filter(
             Conversation.id == conversation_id,
-            Conversation.user_id == current_user.id
+            Conversation.user_id == 1
         ).first()
         
         if not conversation:
@@ -234,14 +235,13 @@ async def delete_conversation(
 async def update_conversation(
     conversation_id: int,
     conversation_data: ConversationUpdate,
-    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     try:
-        logger.info(f"📝 用户 {current_user.username} 更新会话 - ID: {conversation_id}")
+        logger.info(f"📝 更新会话 - ID: {conversation_id}")
         conversation = db.query(Conversation).filter(
             Conversation.id == conversation_id,
-            Conversation.user_id == current_user.id
+            Conversation.user_id == 1
         ).first()
         
         if not conversation:

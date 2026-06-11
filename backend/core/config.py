@@ -16,20 +16,18 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
-    ANTHROPIC_MODEL: str = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
+    API_KEY: str = os.getenv("API_KEY", "")
+    MODEL: str = os.getenv("MODEL", "gpt-4o")
 
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174"]
 
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./ai_file_processing.db")
 
-    ANTHROPIC_API_BASE: str = os.getenv("ANTHROPIC_API_BASE", "https://api.anthropic.com/v1")
+    API_BASE: str = os.getenv("API_BASE", "https://api.openai.com/v1")
 
-    QDRANT_HOST: str = os.getenv("QDRANT_HOST", "localhost")
-    QDRANT_PORT: int = int(os.getenv("QDRANT_PORT", "6333"))
-    QDRANT_COLLECTION: str = os.getenv("QDRANT_COLLECTION", "user_memories")
-    QDRANT_RAG_COLLECTION: str = os.getenv("QDRANT_RAG_COLLECTION", "rag_documents")
-    QDRANT_VECTOR_SIZE: int = int(os.getenv("QDRANT_VECTOR_SIZE", "1536"))
+    CHROMA_DB_PATH: str = os.getenv("CHROMA_DB_PATH", "./data/chroma")
+    CHROMA_MEMORY_COLLECTION: str = os.getenv("CHROMA_MEMORY_COLLECTION", "user_memories")
+    CHROMA_RAG_COLLECTION: str = os.getenv("CHROMA_RAG_COLLECTION", "rag_documents")
 
     class Config:
         env_file = ".env"

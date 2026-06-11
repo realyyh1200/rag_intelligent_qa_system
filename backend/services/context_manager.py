@@ -7,9 +7,10 @@
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from services.gsc_pipeline import GSSCPipeline, StructuredContext
-from services.memory_storage import memory_storage
-from services.qdrant_service import QdrantService
+from services.session_storage import SessionStorage
+from services.chroma_service import ChromaService
 from services.rag_service import RAGService
+from services.memory_service import MemoryService
 from core.logger import logger
 
 
@@ -44,7 +45,7 @@ class ContextManager:
                  min_relevance_threshold: float = 0.2):
         self.user_id = user_id
         self.max_token_budget = max_token_budget
-        
+
         # 初始化组件
         self.pipeline = GSSCPipeline(
             max_token_budget=max_token_budget,
@@ -52,11 +53,12 @@ class ContextManager:
             recency_weight=recency_weight,
             min_relevance_threshold=min_relevance_threshold
         )
-        
-        self.qdrant_service = QdrantService()
+
+        self.chroma_service = ChromaService()
         self.rag_service = RAGService(user_id)
-        self.memory_storage = memory_storage
-        
+        self.session_storage = SessionStorage()
+        self.memory_service = MemoryService(user_id)
+
         # 统计信息
         self.stats = {
             "total_builds": 0,
@@ -180,64 +182,28 @@ class ContextManager:
     def _recall_memories(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
         """
         召回相关记忆
-        
-        使用两步查询:
-        1. 从JSON索引中快速搜索关键词
-        2. 结合向量相似度（如果有Qdrant）
+
+        使用 MemoryService 的混合检索（BM25 + 向量 + RRF）
         """
-        memories = []
-        
-        # 1. 从JSON索引获取候选记忆
-        query_keywords = self._extract_keywords(query)
-        
-        candidate_ids = set()
-        candidate_scores = {}
-        
-        # 搜索每个关键词
-        for keyword in query_keywords:
-            keyword_results = self.memory_storage.search_by_keyword(self.user_id, keyword, limit=top_k * 2)
-            for memory in keyword_results:
-                memory_id = memory.get('id')
-                if memory_id:
-                    candidate_ids.add(memory_id)
-                    # 基于关键词匹配度评分
-                    keyword_match = sum(1 for kw in query_keywords if kw in memory.get('keywords', []))
-                    candidate_scores[memory_id] = candidate_scores.get(memory_id, 0) + keyword_match
-        
-        # 如果没有JSON索引结果，尝试Qdrant
-        if not candidate_ids and self.qdrant_service.is_connected():
-            try:
-                from services.bge_service import bge_service
-                query_embedding = bge_service.encode_query(query)
-                qdrant_results = self.qdrant_service.search_vectors(
-                    query_vector=query_embedding,
-                    user_id=self.user_id,
-                    limit=top_k
-                )
-                
-                for result in qdrant_results:
-                    memory_id = result['payload'].get('memory_id')
-                    if memory_id:
-                        memory = self.memory_storage.get(self.user_id, memory_id)
-                        if memory:
-                            memories.append(memory)
-            except Exception as e:
-                logger.warning(f"⚠️ Qdrant记忆搜索失败: {e}")
-        
-        # 加载候选记忆并排序
-        for memory_id in candidate_ids:
-            memory = self.memory_storage.get(self.user_id, memory_id)
-            if memory:
-                # 结合重要性评分
-                importance = memory.get('importance', 1)
-                keyword_score = candidate_scores.get(memory_id, 0)
-                memory['relevance_score'] = keyword_score + (importance / 10.0)
+        try:
+            # 使用 MemoryService 的混合检索
+            results = self.memory_service.hybrid.search(
+                query=query,
+                top_k=top_k
+            )
+
+            # 转换为标准格式
+            memories = []
+            for memory, score, source in results:
+                memory['relevance_score'] = score
+                memory['source'] = source
                 memories.append(memory)
-        
-        # 按相关性评分排序
-        memories.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
-        
-        return memories[:top_k]
+
+            logger.info(f"   🧠 记忆召回完成: {len(memories)} 条 (来源: {[m['source'] for m in memories]})")
+            return memories
+        except Exception as e:
+            logger.error(f"   ❌ 记忆召回失败: {e}")
+            return []
     
     def _extract_keywords(self, text: str) -> List[str]:
         """从文本中提取关键词"""
@@ -266,66 +232,35 @@ class ContextManager:
                    metadata: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         保存新记忆
-        
-        使用结构化JSON存储，自动更新索引
+
+        使用 SessionStorage (JSONL) 存储
         """
-        memory = self.memory_storage.add(
-            user_id=self.user_id,
+        memory = self.memory_service.add_memory(
             content=content,
             memory_type=memory_type,
             importance=importance,
-            conversation_id=conversation_id,
             metadata=metadata
         )
-        
-        # 如果Qdrant可用，也存入向量数据库加速检索
-        if self.qdrant_service.is_connected():
-            try:
-                self._save_memory_to_vector(memory)
-            except Exception as e:
-                logger.warning(f"⚠️ 记忆存入Qdrant失败: {e}")
-        
+
+        logger.info(f"✅ 记忆已保存: {memory.get('id')}")
         return memory
-    
-    def _save_memory_to_vector(self, memory: Dict[str, Any]) -> None:
-        """将记忆存入Qdrant向量数据库"""
-        from services.bge_service import bge_service
-        
-        memory_id = memory.get('id')
-        content = memory.get('content', '')
-        
-        # 生成向量
-        embedding = bge_service.encode([content])[0]
-        # 确保是list格式
-        if hasattr(embedding, 'tolist'):
-            embedding = embedding.tolist()
-        
-        # 存入Qdrant
-        self.qdrant_service.upsert_memory(
-            user_id=self.user_id,
-            memory_id=memory_id,
-            content=content,
-            vector=embedding,
-            memory_type=memory.get('memory_type'),
-            importance=memory.get('importance', 1),
-            metadata=memory.get('metadata', {})
-        )
-    
+
     def get_memory_stats(self) -> Dict[str, Any]:
         """获取记忆统计"""
-        return self.memory_storage.get_stats(self.user_id)
-    
+        return self.session_storage.get_user_stats(self.user_id)
+
     def get_recent_memories(self, limit: int = 10) -> List[Dict[str, Any]]:
         """获取最近记忆"""
-        return self.memory_storage.get_recent(self.user_id, limit)
-    
+        # 从所有会话中获取最近的记忆
+        all_memories = self.memory_service.get_user_memories(limit=limit)
+        # 按创建时间排序
+        all_memories.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        return all_memories[:limit]
+
     def get_important_memories(self, min_importance: int = 7) -> List[Dict[str, Any]]:
         """获取重要记忆"""
-        return self.memory_storage.get_important(self.user_id, min_importance)
-    
-    def optimize_memory_index(self) -> None:
-        """优化记忆索引"""
-        self.memory_storage.optimize_index(self.user_id)
+        all_memories = self.memory_service.get_user_memories()
+        return [m for m in all_memories if m.get('importance', 0) >= min_importance]
     
     def get_stats(self) -> Dict[str, Any]:
         """获取ContextManager统计信息"""

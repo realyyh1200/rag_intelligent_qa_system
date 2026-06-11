@@ -9,9 +9,9 @@
 - 💬 **智能问答** - 基于RAG知识库进行问答
 - 🔍 **闲聊检测** - 智能区分闲聊和专业问题
 - 🔄 **RRF融合检索** - 倒数排名融合多检索器结果
-- 🎯 **精排优化** - Cross-encoder精排提升检索精度
+- 🎯 **精排优化** - 轻量级精排提升检索精度
 - 📊 **GSSC上下文管理** - Generate-Score-Select-Compress流水线
-- 🧠 **结构化记忆** - JSON存储 + 索引加速查询
+- 🧠 **会话记忆** - JSONL格式存储，支持会话级记忆
 - 📱 **流式响应** - 实时流式输出AI回答
 
 ## 技术栈
@@ -20,10 +20,11 @@
 |------|------|------|
 | 前端 | Vue 3 + Element Plus | 现代化UI框架 |
 | 后端 | FastAPI + Python | 高性能API服务 |
-| 向量存储 | Qdrant | 本地向量数据库 |
-| 嵌入模型 | BGE | 中文语义嵌入 |
-| 精排模型 | Cross-encoder | 文档相关性精排 |
-| 记忆存储 | JSON文件系统 | 结构化JSON + 索引加速 |
+| 向量存储 | ChromaDB | 本地向量数据库 |
+| 嵌入模型 | 轻量级本地嵌入 | 词频+哈希向量表示 |
+| 精排模型 | 轻量级Jaccard相似度 | 无需外部模型依赖 |
+| 记忆存储 | SessionStorage (JSONL) | 会话级记忆存储 |
+| AI模型 | OpenAI API | 支持多种模型 |
 
 ## 项目结构
 
@@ -31,37 +32,41 @@
 ai_coding_website/
 ├── backend/
 │   ├── api/              # API路由
-│   │   ├── auth.py       # 认证相关API
 │   │   ├── chat.py       # 聊天相关API
-│   │   └── rag.py        # RAG管理API
+│   │   ├── rag.py        # RAG管理API
+│   │   └── user.py       # 用户信息API
 │   ├── core/             # 核心配置
 │   │   ├── config.py     # 应用配置
-│   │   ├── logger.py     # 日志配置
-│   │   └── security.py   # JWT认证和安全工具
+│   │   └── logger.py     # 日志配置
 │   ├── db/               # 数据库
 │   │   └── database.py   # 数据库连接
 │   ├── models/           # 数据模型
-│   │   └── user.py       # User, Conversation, Message模型
+│   │   ├── conversation.py  # 会话模型
+│   │   ├── memory.py        # 记忆模型
+│   │   └── rag.py           # RAG文档模型
 │   ├── schemas/          # Pydantic模式
 │   │   └── schema.py     # 请求/响应模式
 │   ├── services/         # 业务逻辑
-│   │   ├── anthropic_service.py   # AI模型服务
-│   │   ├── bge_service.py         # BGE嵌入服务
-│   │   ├── bm25_service.py        # BM25全文检索服务
-│   │   ├── cross_encoder_service.py # Cross-encoder精排服务
-│   │   ├── memory_service.py      # 记忆服务（Qdrant存储）
-│   │   ├── memory_storage.py      # 结构化JSON记忆存储
-│   │   ├── qdrant_service.py      # Qdrant向量服务
-│   │   ├── rag_service.py         # RAG检索服务（RRF融合）
-│   │   ├── rrf_fusion.py           # RRF倒数排名融合
-│   │   ├── gsc_pipeline.py        # GSSC上下文管理流水线
-│   │   ├── context_manager.py      # 上下文管理器
-│   │   └── chit_chat_detector.py   # 闲聊检测服务
-│   ├── test/              # 测试脚本
+│   │   ├── openai_service.py    # OpenAI模型服务
+│   │   ├── embedding_service.py # 轻量级嵌入服务
+│   │   ├── bm25_service.py      # BM25全文检索服务
+│   │   ├── chroma_service.py    # ChromaDB向量服务
+│   │   ├── session_storage.py   # JSONL会话存储
+│   │   ├── memory_service.py    # 记忆服务
+│   │   ├── rag_service.py       # RAG检索服务（RRF融合）
+│   │   ├── rrf_fusion.py        # RRF倒数排名融合
+│   │   ├── gsc_pipeline.py      # GSSC上下文管理流水线
+│   │   ├── context_manager.py   # 上下文管理器
+│   │   └── chit_chat_detector.py # 闲聊检测服务
+│   ├── test/             # 测试脚本
 │   │   ├── test_rag_refactor.py    # RAG重构测试
-│   │   └── test_rrf_fusion.py      # RRF融合测试
-│   ├── main.py            # FastAPI应用入口
-│   └── requirements.txt   # Python依赖
+│   │   ├── test_rrf_fusion.py      # RRF融合测试
+│   │   └── test_e2e.py             # 端到端测试
+│   ├── data/             # 数据存储
+│   │   ├── chroma/       # ChromaDB向量数据
+│   │   └── memories/     # 会话记忆JSONL文件
+│   ├── main.py           # FastAPI应用入口
+│   └── pyproject.toml    # Python依赖配置
 │
 └── frontend/
     ├── src/
@@ -74,6 +79,7 @@ ai_coding_website/
     │   └── main.js
     ├── index.html
     └── package.json
+    └── vite.config.js    # Vite配置（含代理）
 ```
 
 ## 快速开始
@@ -83,9 +89,6 @@ ai_coding_website/
 - Python 3.10+
 - Node.js 18+
 - uv（推荐的Python包管理器）
-- Qdrant向量数据库（不再依赖MySQL存储RAG/记忆）
-- BAAI/bge-small-zh-v1.5 BGE嵌入模型
-- ms-marco-MiniLM-L-6-v2 Cross-encoder精排模型
 
 ### 后端启动
 
@@ -100,10 +103,10 @@ cp .env.example .env
 # 编辑.env文件，填入你的API密钥等配置
 
 # 启动服务器
-uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+uv run uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
-**API文档地址**: http://localhost:8000/docs
+**API文档地址**: http://localhost:8080/docs
 
 ### 前端启动
 
@@ -176,24 +179,24 @@ RRF_score(d) = Σ 1/(k + rank(d))
 └─────────────────────────────────────────┘
 ```
 
-### 结构化JSON记忆存储
+### 会话记忆存储 (SessionStorage)
 
-长期记忆以JSON格式存储，使用index.json索引加速查询：
+使用JSONL格式存储会话级记忆：
 
 ```
 data/memories/
 └── user_1/
-    ├── index.json          # 索引文件
-    ├── mem_20240101_0001.json
-    ├── mem_20240101_0002.json
+    ├── sessions.json          # 会话索引文件
+    ├── sess_20260611_222750_1.jsonl
+    ├── sess_20260611_223203_2.jsonl
     └── ...
 ```
 
-**查询加速**：
-- 关键词搜索
-- 类型查询
-- 重要性查询
-- 对话关联查询
+**特点**：
+- 每个会话独立文件
+- 支持追加写入
+- 自动索引管理
+- 会话级记忆隔离
 
 ## RAG工作流程
 
@@ -210,7 +213,7 @@ data/memories/
                     ▼
 ┌─────────────────────────────────────────┐
 │  并行处理                                │
-│  • BGE向量嵌入 → Qdrant                 │
+│  • 轻量级向量嵌入 → ChromaDB            │
 │  • BM25索引构建                          │
 └─────────────────────────────────────────┘
 
@@ -219,7 +222,7 @@ data/memories/
     ▼
 ┌─────────────────────────────────────────┐
 │  三路并行检索                            │
-│  • 向量检索 (Qdrant)                    │
+│  • 向量检索 (ChromaDB)                  │
 │  • BM25检索                             │
 │  • 关键词检索                           │
 └─────────────────────────────────────────┘
@@ -232,8 +235,8 @@ data/memories/
                     │
                     ▼
 ┌─────────────────────────────────────────┐
-│  Cross-encoder精排                      │
-│  取Top20候选，结果更精准                │
+│  轻量级精排                              │
+│  Jaccard相似度精排，无需外部模型         │
 └─────────────────────────────────────────┘
                     │
                     ▼
@@ -248,19 +251,16 @@ data/memories/
 
 ## 功能特性
 
-- ✅ 用户注册和登录
-- ✅ JWT令牌认证（Access Token + Refresh Token）
 - ✅ 流式AI响应输出
 - ✅ 多对话管理
 - ✅ 对话历史持久化
-- ✅ 用户信息管理
 - ✅ 自定义RAG知识库构建
 - ✅ 文件内容自动总结
 - ✅ 闲聊/专业问题智能区分
 - ✅ RRF融合多检索器
-- ✅ Cross-encoder精排优化
+- ✅ 轻量级精排优化
 - ✅ GSSC上下文管理流水线
-- ✅ 结构化JSON记忆存储
+- ✅ 会话级记忆存储
 
 ## 配置说明
 
@@ -268,16 +268,17 @@ data/memories/
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `ANTHROPIC_API_KEY` | Anthropic API密钥 | - |
+| `API_KEY` | OpenAI API密钥 | - |
+| `API_BASE` | OpenAI API地址 | https://api.openai.com/v1 |
+| `MODEL` | 使用的模型名称 | gpt-4o |
 | `SECRET_KEY` | JWT加密密钥 | - |
-| `QDRANT_HOST` | Qdrant服务地址 | localhost |
-| `QDRANT_PORT` | Qdrant服务端口 | 6333 |
+| `CHROMA_DB_PATH` | ChromaDB数据路径 | ./data/chroma |
 
 ## 使用示例
 
 ### 1. 构建知识库
 
-1. 登录系统
+1. 打开系统
 2. 上传文档文件
 3. 系统自动构建RAG索引（向量化 + BM25）
 
@@ -314,10 +315,13 @@ AI：这份文档主要讲述了...
 ```bash
 # 测试RRF融合
 cd backend
-python test/test_rrf_fusion.py
+uv run python test/test_rrf_fusion.py
 
 # 测试RAG重构
-python test/test_rag_refactor.py
+uv run python test/test_rag_refactor.py
+
+# 端到端测试
+uv run python test/test_e2e.py
 ```
 
 ## 架构演进
@@ -329,6 +333,9 @@ python test/test_rag_refactor.py
 | v3.0 | RRF替代加权求和 |
 | v4.0 | GSSC上下文管理流水线 |
 | v5.0 | 结构化JSON记忆存储 |
+| v6.0 | Anthropic → OpenAI，移除认证系统 |
+| v7.0 | ChromaDB替代Qdrant，轻量级嵌入方案 |
+| v8.0 | SessionStorage JSONL记忆存储 |
 
 ## License
 

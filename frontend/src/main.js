@@ -2,16 +2,11 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
-import Login from './views/Login.vue'
-import Register from './views/Register.vue'
 import Chat from './views/Chat.vue'
-import { useAuthStore } from './store/auth'
 
 const routes = [
-  { path: '/', redirect: '/login' },
-  { path: '/login', component: Login },
-  { path: '/register', component: Register },
-  { path: '/chat', component: Chat, meta: { requiresAuth: true } },
+  { path: '/', redirect: '/chat' },
+  { path: '/chat', component: Chat },
 ]
 
 const router = createRouter({
@@ -22,19 +17,5 @@ const router = createRouter({
 const app = createApp(App)
 const pinia = createPinia()
 app.use(pinia)
-
-router.beforeEach((to, from, next) => {
-  const authStore = useAuthStore()
-  const hasToken = !!localStorage.getItem('access_token')
-
-  if (to.meta.requiresAuth && !hasToken) {
-    next('/login')
-  } else if ((to.path === '/login' || to.path === '/register') && hasToken) {
-    next('/chat')
-  } else {
-    next()
-  }
-})
-
 app.use(router)
 app.mount('#app')

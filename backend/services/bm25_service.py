@@ -42,6 +42,11 @@ class BM25Service:
     
     def tokenize(self, text: str) -> List[str]:
         """对文本进行分词"""
+        # 处理输入可能是列表的情况
+        if isinstance(text, list):
+            # 如果是列表，将所有元素拼接成字符串
+            text = " ".join(str(t) for t in text)
+        
         text = text.lower()
         stop_words = {
             'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
